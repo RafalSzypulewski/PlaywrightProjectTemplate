@@ -6,24 +6,28 @@ const backpack = 'Sauce Labs Backpack';
 // Start every test already signed in as `standard` (session saved by the setup project).
 test.use({ storageState: authFile('standard') });
 
-test.describe('inventory', { tag: '@smoke' }, () => {
+test.describe('inventory', { tag: ['@e2e', '@regression'] }, () => {
   test.beforeEach(async ({ inventoryPage }) => {
     await inventoryPage.goto();
   });
 
-  test('lists the available products', async ({ inventoryPage }) => {
+  test('lists the available products', { tag: '@smoke' }, async ({ inventoryPage }) => {
     await expect(inventoryPage.products).toHaveCount(6);
     await expect(inventoryPage.product(backpack).price).toHaveText('$29.99');
   });
 
-  test('adding a product shows it in the cart badge', async ({ inventoryPage, appHeader }) => {
-    const card = inventoryPage.product(backpack);
+  test(
+    'adding a product shows it in the cart badge',
+    { tag: '@smoke' },
+    async ({ inventoryPage, appHeader }) => {
+      const card = inventoryPage.product(backpack);
 
-    await card.addToCart();
+      await card.addToCart();
 
-    await expect(appHeader.cartBadge).toHaveText('1');
-    await expect(card.removeButton).toBeVisible();
-  });
+      await expect(appHeader.cartBadge).toHaveText('1');
+      await expect(card.removeButton).toBeVisible();
+    },
+  );
 
   test('removing a product empties the cart badge', async ({ inventoryPage, appHeader }) => {
     const card = inventoryPage.product(backpack);

@@ -1,12 +1,16 @@
 import { login } from '../../src/api/auth';
 import { expect, test } from '../../src/fixtures';
 
-test.describe('booking API', { tag: '@api' }, () => {
-  test('a created booking can be retrieved by id', async ({ bookingClient, booking }) => {
-    const retrieved = await bookingClient.get(booking.bookingid);
+test.describe('booking API', { tag: ['@api', '@regression'] }, () => {
+  test(
+    'a created booking can be retrieved by id',
+    { tag: '@smoke' },
+    async ({ bookingClient, booking }) => {
+      const retrieved = await bookingClient.get(booking.bookingid);
 
-    expect(retrieved).toEqual(booking.booking);
-  });
+      expect(retrieved).toEqual(booking.booking);
+    },
+  );
 
   test('bookings created with overrides are stored independently', async ({
     bookingClient,

@@ -19,17 +19,21 @@ npm test
 
 ## Scripts
 
-| Script                  | Purpose                                    |
-| ----------------------- | ------------------------------------------ |
-| `npm test`              | Run all tests on Chromium, Firefox, WebKit |
-| `npm run test:chromium` | Run on Chromium only                       |
-| `npm run report`        | Open the last HTML report                  |
-| `npm run lint`          | ESLint (type-aware)                        |
-| `npm run typecheck`     | `tsc --noEmit`, strict mode                |
-| `npm run format`        | Prettier write (`format:check` to verify)  |
-| `npm run check:env`     | `.env.example` matches `env.schema.ts`     |
-| `npm run auth:clear`    | Delete saved sessions (`.auth/`)           |
-| `npm run test:api`      | Run the standalone API tests (no browser)  |
+| Script                    | Purpose                                    |
+| ------------------------- | ------------------------------------------ |
+| `npm test`                | Run all tests on Chromium, Firefox, WebKit |
+| `npm run test:chromium`   | Run on Chromium only                       |
+| `npm run report`          | Open the last HTML report                  |
+| `npm run lint`            | ESLint (type-aware)                        |
+| `npm run typecheck`       | `tsc --noEmit`, strict mode                |
+| `npm run format`          | Prettier write (`format:check` to verify)  |
+| `npm run check:env`       | `.env.example` matches `env.schema.ts`     |
+| `npm run auth:clear`      | Delete saved sessions (`.auth/`)           |
+| `npm run test:smoke`      | Run tests tagged `@smoke`                  |
+| `npm run test:regression` | Run tests tagged `@regression` (all tests) |
+| `npm run test:e2e`        | Run tests tagged `@e2e` (UI, all browsers) |
+| `npm run test:api`        | Run tests tagged `@api` (no browser)       |
+| `npm run check:tags`      | Every test has valid, known tags           |
 
 ## Configuration
 
@@ -108,6 +112,31 @@ To add an endpoint group, add a model, a client class and a fixture that constru
 
 Test data rules (factories, unique values, API-created data and cleanup, per-environment data) are
 in [docs/test-data.md](docs/test-data.md).
+
+## Tagging
+
+Tags use Playwright's native `tag` option and `--grep`. Every test carries one **type** tag and the
+**scope** tags below:
+
+| Tag           | Meaning                                                                       |
+| ------------- | ----------------------------------------------------------------------------- |
+| `@e2e`        | Drives the UI in a browser (runs in every browser project)                    |
+| `@api`        | Calls the API only (runs once in the browserless `api` project)               |
+| `@regression` | In the full regression run. Every test has it                                 |
+| `@smoke`      | Critical-path subset, fast enough for every change. Also tagged `@regression` |
+
+```ts
+test.describe('inventory', { tag: ['@e2e', '@regression'] }, () => {
+  test('lists the available products', { tag: '@smoke' }, async ({ inventoryPage }) => { ... });
+});
+```
+
+Combine scripts with Playwright options, e.g. `npm run test:smoke -- --project=chromium`, or run
+arbitrary expressions with `npx playwright test --grep "@smoke|@api"` and `--grep-invert @slow`.
+Tag filters do not filter the auth setup project, so `@smoke` runs still authenticate.
+`npm run check:tags` fails on an unknown tag (e.g. a typo) or a test missing its type or scope tag,
+so a mistake cannot silently drop a test from a run. Project-specific tags (feature areas,
+`@destructive`) can be added to `KNOWN` in `scripts/check-tags.ts`.
 
 ## Defaults
 

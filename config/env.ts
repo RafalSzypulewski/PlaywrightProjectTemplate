@@ -23,6 +23,11 @@ if (!parsed.success) {
 
 const raw = parsed.data;
 
+export interface RoleCredentials {
+  readonly username: string;
+  readonly password: string;
+}
+
 export interface Env {
   readonly testEnv: 'dev' | 'staging' | 'prod-smoke';
   readonly isCI: boolean;
@@ -30,6 +35,16 @@ export interface Env {
   readonly logLevel: 'debug' | 'info' | 'warn' | 'error';
   readonly baseUrl: string;
   readonly api: { readonly baseUrl: string };
+  readonly auth: {
+    readonly maxAgeMinutes: number;
+    /** Roles to authenticate; undefined means all roles in `users`. */
+    readonly roles: readonly string[] | undefined;
+  };
+  /** Credentials per role. The keys of this object are the authenticable roles. */
+  readonly users: {
+    readonly standard: RoleCredentials;
+    readonly problem: RoleCredentials;
+  };
 }
 
 /** Typed, validated, immutable configuration. The only place `process.env` is read. */
@@ -40,6 +55,11 @@ export const env: Env = Object.freeze({
   logLevel: raw.LOG_LEVEL,
   baseUrl: raw.BASE_URL,
   api: Object.freeze({ baseUrl: raw.API_BASE_URL ?? raw.BASE_URL }),
+  auth: Object.freeze({ maxAgeMinutes: raw.AUTH_MAX_AGE_MIN, roles: raw.AUTH_ROLES }),
+  users: Object.freeze({
+    standard: Object.freeze({ username: raw.STANDARD_USERNAME, password: raw.STANDARD_PASSWORD }),
+    problem: Object.freeze({ username: raw.PROBLEM_USERNAME, password: raw.PROBLEM_PASSWORD }),
+  }),
 });
 
 const SECRET_KEY = /pass(word)?|secret|token|api[-_]?key|credential/i;

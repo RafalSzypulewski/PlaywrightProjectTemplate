@@ -28,6 +28,7 @@ npm test
 | `npm run typecheck`     | `tsc --noEmit`, strict mode                |
 | `npm run format`        | Prettier write (`format:check` to verify)  |
 | `npm run check:env`     | `.env.example` matches `env.schema.ts`     |
+| `npm run auth:clear`    | Delete saved sessions (`.auth/`)           |
 
 ## Configuration
 
@@ -43,17 +44,44 @@ Empty values count as unset. Missing or invalid values fail at startup with a li
 names and reasons (values are never printed). Import `env` from `config/env` in the Playwright
 config; tests receive it through a fixture once fixtures exist.
 
-| Variable       | Description                                           |
-| -------------- | ----------------------------------------------------- |
-| `TEST_ENV`     | `dev` (default), `staging` or `prod-smoke`            |
-| `BASE_URL`     | Application under test (required)                     |
-| `API_BASE_URL` | Optional; defaults to `BASE_URL`                      |
-| `LOG_LEVEL`    | `debug`, `info` (default), `warn` or `error`          |
-| `WORKERS`      | Optional worker count override                        |
-| `CI`           | Set by CI providers; enables retries and `forbidOnly` |
+| Variable                             | Description                                               |
+| ------------------------------------ | --------------------------------------------------------- |
+| `TEST_ENV`                           | `dev` (default), `staging` or `prod-smoke`                |
+| `BASE_URL`                           | Application under test (required)                         |
+| `API_BASE_URL`                       | Optional; defaults to `BASE_URL`                          |
+| `LOG_LEVEL`                          | `debug`, `info` (default), `warn` or `error`              |
+| `WORKERS`                            | Optional worker count override                            |
+| `CI`                                 | Set by CI providers; enables retries and `forbidOnly`     |
+| `<ROLE>_USERNAME`, `<ROLE>_PASSWORD` | Credentials per role (required), e.g. `STANDARD_USERNAME` |
+| `AUTH_MAX_AGE_MIN`                   | Reuse saved sessions younger than this (default 60)       |
+| `AUTH_ROLES`                         | Optional comma-separated subset of roles to authenticate  |
 
 Adding a variable: add it to `env.schema.ts`, expose it in `env.ts`, document it in
 `.env.example`, then run `npm run check:env`.
+
+## Authentication
+
+Sessions are created once per run, outside the tests, and reused through Playwright's
+`storageState`. Tests do not log in through the UI unless login is the feature under test.
+
+- **Setup project:** [tests/setup/auth.setup.ts](tests/setup/auth.setup.ts) authenticates every
+  role and saves `.auth/<TEST_ENV>/<role>.json`. Browser projects depend on it. It runs with
+  trace, video and screenshots off.
+- **Roles:** the keys of `env.users` (see [src/auth/state.ts](src/auth/state.ts)). Credentials come
+  only from env. A role's login method is set in
+  [src/auth/authenticate.ts](src/auth/authenticate.ts): prefer an API login when the app has one,
+  otherwise log in through the UI. The demo app only has UI login.
+- **Freshness:** a saved session is reused when the file is younger than `AUTH_MAX_AGE_MIN` and no
+  cookie expires within 5 minutes. Keep `AUTH_MAX_AGE_MIN` below the app's real session lifetime.
+  A server that invalidates sessions early, or a token in localStorage, is not detected.
+- **In tests:**
+  - Unauthenticated: the default. Nothing to configure.
+  - One role: `test.use({ storageState: authFile('standard') })`, then navigate.
+  - Several roles in one test: the `contextAs(role)` fixture returns a signed-in context.
+- **Secrets:** `.auth/*.json` hold live session tokens. They are gitignored and must never be
+  uploaded as CI artifacts. Credentials live in `.env` locally and in the CI secret store in CI.
+- **Parallelism:** state files are read-only during tests. Apps with shared per-user server state
+  may need a per-worker user pool; not included until a project needs it.
 
 ## Defaults
 
@@ -64,4 +92,5 @@ Adding a variable: add it to `env.schema.ts`, expose it in `env.ts`, document it
 
 ## Status
 
-Foundation only. Page objects, fixtures, API clients and auth are added per project as needed.
+Foundation with example page objects, components, fixtures and authentication. API clients,
+logging and CI are added per project as needed.

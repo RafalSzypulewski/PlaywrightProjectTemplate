@@ -1,9 +1,9 @@
 import type { Credentials } from '../pages/login.page';
 
-// Public demo credentials published by the demo application. Real projects read credentials from
-// env (see config/env.schema.ts) or create users through an API fixture.
+// Users that cannot (or must not) authenticate, for unauthenticated login tests. Identities that
+// tests sign in as are roles: see src/auth/state.ts and the credentials in env.
+// Public demo credentials published by the demo application.
 export const users = {
-  standard: { username: 'standard_user', password: 'secret_sauce' },
   lockedOut: { username: 'locked_out_user', password: 'secret_sauce' },
 } as const satisfies Record<string, Credentials>;
 

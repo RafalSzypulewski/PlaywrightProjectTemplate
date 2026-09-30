@@ -10,8 +10,7 @@ const isTruthy = (value: string | undefined): boolean =>
  * To add a variable: add it here, expose it in `config/env.ts`, and add it to `.env.example`
  * (`npm run check:env` fails if `.env.example` and this schema drift apart).
  *
- * Secrets have no defaults. Projects that add authentication add e.g. ADMIN_USERNAME and
- * ADMIN_PASSWORD here as `requiredString`, and mask them automatically via `redactedEnv()`.
+ * Secrets have no defaults and are masked automatically by `redactedEnv()`.
  */
 const requiredString = z.string({ error: 'is required' }).min(1, 'is required');
 
@@ -28,6 +27,25 @@ export const envSchema = z.object({
   }),
   /** Defaults to BASE_URL when unset. */
   API_BASE_URL: z.url({ error: 'must be a valid URL' }).optional(),
+
+  /** Saved sessions younger than this are reused instead of logging in again. */
+  AUTH_MAX_AGE_MIN: z.coerce.number().positive().default(60),
+  /** Comma-separated subset of roles to authenticate (default: all). Example: standard,problem */
+  AUTH_ROLES: z
+    .string()
+    .optional()
+    .transform((value) =>
+      value
+        ?.split(',')
+        .map((role) => role.trim())
+        .filter(Boolean),
+    ),
+
+  // One username/password pair per role. Add a pair here (and to `users` in env.ts) per new role.
+  STANDARD_USERNAME: requiredString,
+  STANDARD_PASSWORD: requiredString,
+  PROBLEM_USERNAME: requiredString,
+  PROBLEM_PASSWORD: requiredString,
 });
 
 export type RawEnv = z.infer<typeof envSchema>;

@@ -27,20 +27,33 @@ npm test
 | `npm run lint`          | ESLint (type-aware)                        |
 | `npm run typecheck`     | `tsc --noEmit`, strict mode                |
 | `npm run format`        | Prettier write (`format:check` to verify)  |
+| `npm run check:env`     | `.env.example` matches `env.schema.ts`     |
 
 ## Configuration
 
 - [playwright.config.ts](playwright.config.ts): projects, reporters, retries, workers, artifacts.
-- [config/env.ts](config/env.ts): loads `.env.<TEST_ENV>` then `.env`, validates with zod and
-  exports a typed `env`. This is the only place `process.env` is read.
+- [config/env.schema.ts](config/env.schema.ts): single source of truth for environment variables
+  (names, types, defaults, required/optional).
+- [config/env.ts](config/env.ts): loads and validates the environment, and exports a typed,
+  frozen `env` (plus `redactedEnv()` for logs). The only place `process.env` is read.
 - [.env.example](.env.example): documented variables. Real `.env*` files are gitignored.
 
-| Variable   | Description                                           |
-| ---------- | ----------------------------------------------------- |
-| `TEST_ENV` | `dev` (default), `staging` or `prod-smoke`            |
-| `BASE_URL` | Application under test                                |
-| `WORKERS`  | Optional worker count override                        |
-| `CI`       | Set by CI providers; enables retries and `forbidOnly` |
+Precedence (highest first): real environment variables (CI secrets), `.env.<TEST_ENV>`, `.env`.
+Empty values count as unset. Missing or invalid values fail at startup with a list of variable
+names and reasons (values are never printed). Import `env` from `config/env` in the Playwright
+config; tests receive it through a fixture once fixtures exist.
+
+| Variable       | Description                                           |
+| -------------- | ----------------------------------------------------- |
+| `TEST_ENV`     | `dev` (default), `staging` or `prod-smoke`            |
+| `BASE_URL`     | Application under test (required)                     |
+| `API_BASE_URL` | Optional; defaults to `BASE_URL`                      |
+| `LOG_LEVEL`    | `debug`, `info` (default), `warn` or `error`          |
+| `WORKERS`      | Optional worker count override                        |
+| `CI`           | Set by CI providers; enables retries and `forbidOnly` |
+
+Adding a variable: add it to `env.schema.ts`, expose it in `env.ts`, document it in
+`.env.example`, then run `npm run check:env`.
 
 ## Defaults
 

@@ -1,37 +1,60 @@
 import { config as loadDotenv } from 'dotenv';
-import { z } from 'zod';
+import { envSchema } from './env.schema';
 
-// Load `.env.<TEST_ENV>` first, then `.env`. dotenv never overrides variables that are already set,
-// so real environment variables (e.g. CI secrets) always win, then the env-specific file.
-const testEnv = process.env['TEST_ENV'] ?? 'dev';
-loadDotenv({ path: `.env.${testEnv}`, quiet: true });
+// Precedence (highest first): real environment variables (CI secrets), `.env.<TEST_ENV>`, `.env`.
+// dotenv never overrides variables that are already set, so loading the specific file first works.
+loadDotenv({ path: `.env.${process.env['TEST_ENV'] || 'dev'}`, quiet: true });
 loadDotenv({ quiet: true });
 
-const schema = z.object({
-  TEST_ENV: z.enum(['dev', 'staging', 'prod-smoke']).default('dev'),
-  BASE_URL: z.url(),
-  WORKERS: z.coerce.number().int().positive().optional(),
-  CI: z
-    .string()
-    .optional()
-    .transform(
-      (value) => value !== undefined && value !== '' && value !== 'false' && value !== '0',
-    ),
-});
+// An empty value (`FOO=`) is treated as not set, so required variables cannot pass while blank.
+const source = Object.fromEntries(Object.entries(process.env).filter(([, value]) => value !== ''));
 
-const parsed = schema.safeParse(process.env);
+const parsed = envSchema.safeParse(source);
 
 if (!parsed.success) {
+  // Report names and reasons only. Values are never printed because they may be secrets.
   const details = parsed.error.issues
-    .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
+    .map((issue) => `  - ${issue.path.join('.') || '(root)'}: ${issue.message}`)
     .join('\n');
-  throw new Error(`Invalid environment configuration (see .env.example):\n${details}`);
+  throw new Error(
+    `Invalid environment configuration. Set the variables below (see .env.example):\n${details}`,
+  );
 }
 
-/** Typed, validated environment. The only place `process.env` is read. */
-export const env = {
-  testEnv: parsed.data.TEST_ENV,
-  baseUrl: parsed.data.BASE_URL,
-  workers: parsed.data.WORKERS,
-  isCI: parsed.data.CI,
-};
+const raw = parsed.data;
+
+export interface Env {
+  readonly testEnv: 'dev' | 'staging' | 'prod-smoke';
+  readonly isCI: boolean;
+  readonly workers: number | undefined;
+  readonly logLevel: 'debug' | 'info' | 'warn' | 'error';
+  readonly baseUrl: string;
+  readonly api: { readonly baseUrl: string };
+}
+
+/** Typed, validated, immutable configuration. The only place `process.env` is read. */
+export const env: Env = Object.freeze({
+  testEnv: raw.TEST_ENV,
+  isCI: raw.CI,
+  workers: raw.WORKERS,
+  logLevel: raw.LOG_LEVEL,
+  baseUrl: raw.BASE_URL,
+  api: Object.freeze({ baseUrl: raw.API_BASE_URL ?? raw.BASE_URL }),
+});
+
+const SECRET_KEY = /pass(word)?|secret|token|api[-_]?key|credential/i;
+
+function redact(value: unknown): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, inner]) => [
+      key,
+      SECRET_KEY.test(key) && inner !== undefined ? '***' : redact(inner),
+    ]),
+  );
+}
+
+/** A copy of `env` that is safe to log or attach to reports: secret-looking keys are masked. */
+export function redactedEnv(): unknown {
+  return redact(env);
+}

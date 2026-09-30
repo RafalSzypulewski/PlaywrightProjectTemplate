@@ -17,7 +17,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "check:env": "tsx scripts/check-env-example.ts"
+    "check:env": "tsx scripts/check-env-example.ts",
+    "auth:clear": "node -e \"require('fs').rmSync('.auth',{recursive:true,force:true})\""
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

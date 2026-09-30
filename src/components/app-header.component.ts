@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /** Header shown on every authenticated page: cart entry point and the account menu. */
 export class AppHeader {
@@ -25,7 +25,12 @@ export class AppHeader {
   }
 
   async logout(): Promise<void> {
-    await this.menuButton.click();
-    await this.logoutButton.click();
+    // Right after the first render the menu can ignore the open click or close again by itself
+    // (seen in WebKit under load). Retry the whole open-and-click sequence rather than waiting
+    // blindly; open only while the menu is closed so a retry cannot toggle an open menu shut.
+    await expect(async () => {
+      if (!(await this.logoutButton.isVisible())) await this.menuButton.click();
+      await this.logoutButton.click({ timeout: 5_000 });
+    }).toPass({ timeout: 20_000 });
   }
 }

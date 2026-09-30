@@ -2,16 +2,20 @@ import { users } from '../src/data/users';
 import { expect, test } from '../src/fixtures';
 
 // Login is the feature under test here, so these tests run unauthenticated (no storageState).
-test.describe('login', { tag: '@smoke' }, () => {
+test.describe('login', { tag: ['@e2e', '@regression'] }, () => {
   test.beforeEach(async ({ loginPage }) => {
     await loginPage.goto();
   });
 
-  test('user with valid credentials reaches the product list', async ({ page, loginPage, env }) => {
-    await loginPage.login(env.users.standard);
+  test(
+    'user with valid credentials reaches the product list',
+    { tag: '@smoke' },
+    async ({ page, loginPage, env }) => {
+      await loginPage.login(env.users.standard);
 
-    await expect(page).toHaveURL(/inventory\.html/);
-  });
+      await expect(page).toHaveURL(/inventory\.html/);
+    },
+  );
 
   test('locked out user sees an error and stays on the login page', async ({ page, loginPage }) => {
     await loginPage.login(users.lockedOut);

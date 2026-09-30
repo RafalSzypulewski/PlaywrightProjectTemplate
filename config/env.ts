@@ -34,7 +34,7 @@ export interface Env {
   readonly workers: number | undefined;
   readonly logLevel: 'debug' | 'info' | 'warn' | 'error';
   readonly baseUrl: string;
-  readonly api: { readonly baseUrl: string };
+  readonly api: { readonly baseUrl: string; readonly credentials: RoleCredentials };
   readonly auth: {
     readonly maxAgeMinutes: number;
     /** Roles to authenticate; undefined means all roles in `users`. */
@@ -54,7 +54,10 @@ export const env: Env = Object.freeze({
   workers: raw.WORKERS,
   logLevel: raw.LOG_LEVEL,
   baseUrl: raw.BASE_URL,
-  api: Object.freeze({ baseUrl: raw.API_BASE_URL ?? raw.BASE_URL }),
+  api: Object.freeze({
+    baseUrl: raw.API_BASE_URL ?? raw.BASE_URL,
+    credentials: Object.freeze({ username: raw.API_USERNAME, password: raw.API_PASSWORD }),
+  }),
   auth: Object.freeze({ maxAgeMinutes: raw.AUTH_MAX_AGE_MIN, roles: raw.AUTH_ROLES }),
   users: Object.freeze({
     standard: Object.freeze({ username: raw.STANDARD_USERNAME, password: raw.STANDARD_PASSWORD }),

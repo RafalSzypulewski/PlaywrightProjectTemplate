@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 import { env } from './config/env';
 
+// API specs run once in the browserless 'api' project, not once per browser.
+const apiTests = /[\\/]tests[\\/]api[\\/]/;
+
 export default defineConfig({
   testDir: './tests',
   outputDir: './test-results',
@@ -36,19 +39,27 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], trace: 'off', video: 'off', screenshot: 'off' },
     },
     {
+      // Standalone API tests: no browser, no UI session.
+      name: 'api',
+      testMatch: apiTests,
+    },
+    {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
       dependencies: ['setup'],
+      testIgnore: apiTests,
     },
     {
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
       dependencies: ['setup'],
+      testIgnore: apiTests,
     },
     {
       name: 'webkit',
       use: { ...devices['Desktop Safari'] },
       dependencies: ['setup'],
+      testIgnore: apiTests,
     },
   ],
 });

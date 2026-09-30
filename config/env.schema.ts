@@ -27,6 +27,9 @@ export const envSchema = z.object({
   }),
   /** Defaults to BASE_URL when unset. */
   API_BASE_URL: z.url({ error: 'must be a valid URL' }).optional(),
+  /** Credentials for API authentication (separate from the UI roles below). */
+  API_USERNAME: requiredString,
+  API_PASSWORD: requiredString,
 
   /** Saved sessions younger than this are reused instead of logging in again. */
   AUTH_MAX_AGE_MIN: z.coerce.number().positive().default(60),

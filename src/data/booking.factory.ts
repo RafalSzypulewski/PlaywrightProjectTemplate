@@ -1,11 +1,10 @@
-import { randomUUID } from 'node:crypto';
 import type { Booking } from '../api/models/booking';
+import { unique } from './unique';
 
-/** A valid booking with unique names, so tests never collide on shared data. */
+/** A valid booking with a unique guest name, so tests never collide on shared data. */
 export function buildBooking(overrides: Partial<Booking> = {}): Booking {
-  const unique = randomUUID().slice(0, 8);
   return {
-    firstname: `Test-${unique}`,
+    firstname: unique('guest'),
     lastname: 'Automation',
     totalprice: 150,
     depositpaid: true,

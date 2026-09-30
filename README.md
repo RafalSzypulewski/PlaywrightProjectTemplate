@@ -106,6 +106,9 @@ Built on Playwright's native `APIRequestContext`; nothing wraps `request`.
 
 To add an endpoint group, add a model, a client class and a fixture that constructs it.
 
+Test data rules (factories, unique values, API-created data and cleanup, per-environment data) are
+in [docs/test-data.md](docs/test-data.md).
+
 ## Defaults
 
 - Fully parallel; `50%` of cores locally, 2 workers in CI

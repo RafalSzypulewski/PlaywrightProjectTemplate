@@ -6,5 +6,3 @@ import type { Credentials } from '../pages/login.page';
 export const users = {
   lockedOut: { username: 'locked_out_user', password: 'secret_sauce' },
 } as const satisfies Record<string, Credentials>;
-
-export type Users = typeof users;

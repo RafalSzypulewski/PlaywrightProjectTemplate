@@ -1,3 +1,4 @@
+import { users } from '../src/data/users';
 import { expect, test } from '../src/fixtures';
 
 // Login is the feature under test here, so these tests run unauthenticated (no storageState).
@@ -12,11 +13,7 @@ test.describe('login', { tag: '@smoke' }, () => {
     await expect(page).toHaveURL(/inventory\.html/);
   });
 
-  test('locked out user sees an error and stays on the login page', async ({
-    page,
-    loginPage,
-    users,
-  }) => {
+  test('locked out user sees an error and stays on the login page', async ({ page, loginPage }) => {
     await loginPage.login(users.lockedOut);
 
     await expect(loginPage.errorMessage).toContainText('locked out');

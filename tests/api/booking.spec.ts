@@ -8,6 +8,18 @@ test.describe('booking API', { tag: '@api' }, () => {
     expect(retrieved).toEqual(booking.booking);
   });
 
+  test('bookings created with overrides are stored independently', async ({
+    bookingClient,
+    createBooking,
+  }) => {
+    const cheap = await createBooking({ totalprice: 100 });
+    const pricey = await createBooking({ totalprice: 200 });
+
+    expect(cheap.bookingid).not.toBe(pricey.bookingid);
+    expect((await bookingClient.get(cheap.bookingid)).totalprice).toBe(100);
+    expect((await bookingClient.get(pricey.bookingid)).totalprice).toBe(200);
+  });
+
   test('a deleted booking is no longer found', async ({ bookingClient, booking }) => {
     await bookingClient.delete(booking.bookingid);
 

@@ -1,4 +1,4 @@
-import type { Locator } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 /** Header shown on every authenticated page: cart entry point and the account menu. */
 export class AppHeader {
@@ -7,6 +7,11 @@ export class AppHeader {
   readonly cartBadge: Locator;
   private readonly menuButton: Locator;
   private readonly logoutButton: Locator;
+
+  /** The header of the current page. */
+  static of(page: Page): AppHeader {
+    return new AppHeader(page.getByTestId('primary-header'));
+  }
 
   constructor(root: Locator) {
     this.cartLink = root.getByRole('button', { name: /^Cart/ });

@@ -48,6 +48,27 @@ export default tseslint.config(
     },
   },
   {
+    // Fixtures destructure an empty first argument when they depend on nothing.
+    files: ['src/fixtures/**/*.ts'],
+    rules: { 'no-empty-pattern': ['error', { allowObjectPatternsAsParameters: true }] },
+  },
+  {
+    files: ['tests/**/*.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: '@playwright/test',
+              message: 'Import test and expect from src/fixtures so custom fixtures are available.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['**/*.mjs'],
     ...tseslint.configs.disableTypeChecked,
   },

@@ -1,55 +1,59 @@
-import { expect, test } from '@playwright/test';
-import { InventoryPage } from '../src/pages/inventory.page';
-import { LoginPage } from '../src/pages/login.page';
+import { expect, test } from '../src/fixtures';
 
-// Public demo credentials published by the demo application.
-const validUser = { username: 'standard_user', password: 'secret_sauce' };
 const backpack = 'Sauce Labs Backpack';
 
 test.describe('inventory', { tag: '@smoke' }, () => {
-  let inventory: InventoryPage;
-
-  test.beforeEach(async ({ page }) => {
-    const loginPage = new LoginPage(page);
-    await loginPage.goto();
-    await loginPage.login(validUser);
-    inventory = new InventoryPage(page);
-  });
-
-  test('lists the available products', async () => {
+  test('lists the available products', async ({ signedInInventory: inventory }) => {
     await expect(inventory.products).toHaveCount(6);
     await expect(inventory.product(backpack).price).toHaveText('$29.99');
   });
 
-  test('adding a product shows it in the cart badge', async () => {
+  test('adding a product shows it in the cart badge', async ({
+    signedInInventory: inventory,
+    appHeader,
+  }) => {
     const card = inventory.product(backpack);
 
     await card.addToCart();
 
-    await expect(inventory.header.cartBadge).toHaveText('1');
+    await expect(appHeader.cartBadge).toHaveText('1');
     await expect(card.removeButton).toBeVisible();
   });
 
-  test('removing a product empties the cart badge', async () => {
+  test('removing a product empties the cart badge', async ({
+    signedInInventory: inventory,
+    appHeader,
+  }) => {
     const card = inventory.product(backpack);
     await card.addToCart();
 
     await card.removeFromCart();
 
-    await expect(inventory.header.cartBadge).toBeHidden();
+    await expect(appHeader.cartBadge).toBeHidden();
     await expect(card.addToCartButton).toBeVisible();
   });
 
-  test('opening the cart navigates to the cart page', async ({ page }) => {
-    await inventory.header.openCart();
+  test('opening the cart navigates to the cart page', async ({
+    page,
+    signedInInventory,
+    appHeader,
+  }) => {
+    void signedInInventory;
+    await appHeader.openCart();
 
-    await expect(page).toHaveURL(/cart.html/);
+    await expect(page).toHaveURL(/cart\.html/);
   });
 
-  test('user can log out from the header menu', async ({ page }) => {
-    await inventory.header.logout();
+  test('user can log out from the header menu', async ({
+    page,
+    signedInInventory,
+    appHeader,
+    loginPage,
+  }) => {
+    void signedInInventory;
+    await appHeader.logout();
 
     await expect(page).not.toHaveURL(/inventory\.html/);
-    await expect(new LoginPage(page).loginButton).toBeVisible();
+    await expect(loginPage.loginButton).toBeVisible();
   });
 });

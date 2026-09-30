@@ -29,6 +29,7 @@ npm test
 | `npm run format`        | Prettier write (`format:check` to verify)  |
 | `npm run check:env`     | `.env.example` matches `env.schema.ts`     |
 | `npm run auth:clear`    | Delete saved sessions (`.auth/`)           |
+| `npm run test:api`      | Run the standalone API tests (no browser)  |
 
 ## Configuration
 
@@ -82,6 +83,28 @@ Sessions are created once per run, outside the tests, and reused through Playwri
   uploaded as CI artifacts. Credentials live in `.env` locally and in the CI secret store in CI.
 - **Parallelism:** state files are read-only during tests. Apps with shared per-user server state
   may need a per-worker user pool; not included until a project needs it.
+
+## API testing
+
+Built on Playwright's native `APIRequestContext`; nothing wraps `request`.
+
+- **Clients:** [src/api/clients/booking.client.ts](src/api/clients/booking.client.ts) is a thin typed
+  class: one method per endpoint, returning validated models and throwing `ApiError` on failure.
+- **Models:** zod schemas in [src/api/models/](src/api/models/) give both types and runtime
+  validation, so a changed response shape fails with a clear message.
+- **Errors:** [src/api/http.ts](src/api/http.ts) (`ensureOk`, `readJson`) throws `ApiError` with the
+  call, status, URL and a truncated body. Do not put secrets in response logging.
+- **Authentication:** [src/api/auth.ts](src/api/auth.ts) exchanges credentials for a token and is the
+  only place that knows how the token is attached. The `apiToken` fixture logs in once per worker
+  and keeps the token in memory (nothing written to disk).
+- **Fixtures:** `anonymousApi` (no credentials), `apiRequest` (authenticated `APIRequestContext`),
+  `bookingClient`, and `booking` (a record created through the API and removed afterwards). They
+  are in the shared `test`, so a UI spec can request `booking` for API-based setup. Contexts are
+  created per test and disposed, so UI tests that do not ask for them never pay for an API login.
+- **Projects:** specs in `tests/api/` run once in the browserless `api` project; the browser
+  projects ignore that folder.
+
+To add an endpoint group, add a model, a client class and a fixture that constructs it.
 
 ## Defaults
 

@@ -18,7 +18,8 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "check:env": "tsx scripts/check-env-example.ts",
-    "auth:clear": "node -e \"require('fs').rmSync('.auth',{recursive:true,force:true})\""
+    "auth:clear": "node -e \"require('fs').rmSync('.auth',{recursive:true,force:true})\"",
+    "test:api": "playwright test --project=api"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

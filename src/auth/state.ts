@@ -15,6 +15,14 @@ const EXPIRY_MARGIN_SECONDS = 300;
  * from one environment are never reused against another.
  */
 export function authFile(role: Role): string {
+  // Without this, a role left out of AUTH_ROLES would silently reuse an old (possibly expired)
+  // session file, or fail later with a bare "file not found".
+  if (env.auth.roles && !env.auth.roles.includes(role)) {
+    throw new Error(
+      `Role '${role}' is not authenticated in this run (AUTH_ROLES=${env.auth.roles.join(',')}). ` +
+        `Add it to AUTH_ROLES or unset AUTH_ROLES.`,
+    );
+  }
   return path.resolve('.auth', env.testEnv, `${role}.json`);
 }
 

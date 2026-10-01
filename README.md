@@ -138,6 +138,40 @@ Tag filters do not filter the auth setup project, so `@smoke` runs still authent
 so a mistake cannot silently drop a test from a run. Project-specific tags (feature areas,
 `@destructive`) can be added to `KNOWN` in `scripts/check-tags.ts`.
 
+## CI (GitHub Actions)
+
+[.github/workflows/playwright.yml](.github/workflows/playwright.yml) runs on pull requests, pushes
+to `main`, a nightly schedule and manual dispatch.
+
+| Trigger                 | What runs                                                        |
+| ----------------------- | ---------------------------------------------------------------- |
+| Pull request            | Quality checks, then `@smoke` on Chromium + API (1 shard)        |
+| `main`, nightly, manual | Quality checks, then full `@regression`, all browsers (2 shards) |
+
+Jobs: `plan` (decides shards/projects/tag filter) → `quality` (lint, typecheck, format, `check:env`,
+`check:tags`) → `test` (matrix of shards, blob reports) → `report` (merges into one HTML report with
+traces, screenshots and videos). The merged report is the `playwright-report` artifact (14 days).
+Every shard runs the auth setup project itself, so sharding is safe. Raise the shard count in the
+`plan` job as the suite grows. A manual run can override the tag filter.
+
+Configure the repository once (Settings → Secrets and variables → Actions), or with the GitHub CLI:
+
+```bash
+gh variable set BASE_URL --body "https://www.saucedemo.com"
+gh variable set API_BASE_URL --body "https://restful-booker.herokuapp.com"
+gh variable set STANDARD_USERNAME --body "standard_user"
+gh variable set PROBLEM_USERNAME --body "problem_user"
+gh variable set API_USERNAME --body "admin"
+gh secret set STANDARD_PASSWORD
+gh secret set PROBLEM_PASSWORD
+gh secret set API_PASSWORD
+```
+
+`gh secret set NAME` prompts for the value, so it never lands in shell history. Missing values fail
+fast with the list of variable names. Pull requests from forks do not receive secrets and fail at
+that validation. Actions are pinned to commit SHAs; update them deliberately or with Dependabot.
+Artifacts can contain authenticated traces, so limit who can read them.
+
 ## Defaults
 
 - Fully parallel; `50%` of cores locally, 2 workers in CI

@@ -1,0 +1,187 @@
+name: Playwright tests
+
+# Pull requests:        quality checks + @smoke on Chromium and the API project (1 shard).
+# main / nightly / manual: quality checks + full @regression on all browsers (2 shards).
+#
+# Required repository configuration (Settings > Secrets and variables > Actions):
+#   Variables: BASE_URL, API_BASE_URL, STANDARD_USERNAME, PROBLEM_USERNAME, API_USERNAME
+#   Secrets:   STANDARD_PASSWORD, PROBLEM_PASSWORD, API_PASSWORD
+# Missing values fail fast with a list of the variable names (see config/env.schema.ts).
+# Pull requests from forks do not receive secrets, so they fail at the env validation.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      test_env:
+        description: Environment to test (selects .env.<TEST_ENV> locally; here it only labels the run)
+        type: choice
+        options: [dev, staging, prod-smoke]
+        default: dev
+      grep:
+        description: 'Tag filter, e.g. @smoke or "@api|@smoke" (default: @regression)'
+        type: string
+        default: ''
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+      projects: ${{ steps.plan.outputs.projects }}
+      browsers: ${{ steps.plan.outputs.browsers }}
+      grep: ${{ steps.plan.outputs.grep }}
+    steps:
+      - id: plan
+        env:
+          EVENT: ${{ github.event_name }}
+          GREP_INPUT: ${{ inputs.grep }}
+        run: |
+          if [ "$EVENT" = "pull_request" ]; then
+            {
+              echo 'shards=[{"index":1,"total":1}]'
+              echo 'projects=--project=chromium --project=api'
+              echo 'browsers=chromium'
+              echo 'grep=@smoke'
+            } >> "$GITHUB_OUTPUT"
+          else
+            grep_value="$(printf '%s' "$GREP_INPUT" | tr -d '\r\n')"
+            {
+              echo 'shards=[{"index":1,"total":2},{"index":2,"total":2}]'
+              echo 'projects='
+              echo 'browsers='
+              echo "grep=${grep_value:-@regression}"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+  quality:
+    name: Lint, types and checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TEST_ENV: ${{ inputs.test_env || 'dev' }}
+      BASE_URL: ${{ vars.BASE_URL }}
+      API_BASE_URL: ${{ vars.API_BASE_URL }}
+      STANDARD_USERNAME: ${{ vars.STANDARD_USERNAME }}
+      STANDARD_PASSWORD: ${{ secrets.STANDARD_PASSWORD }}
+      PROBLEM_USERNAME: ${{ vars.PROBLEM_USERNAME }}
+      PROBLEM_PASSWORD: ${{ secrets.PROBLEM_PASSWORD }}
+      API_USERNAME: ${{ vars.API_USERNAME }}
+      API_PASSWORD: ${{ secrets.API_PASSWORD }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run format:check
+      - run: npm run check:env
+      # Lists the tests, which loads the Playwright config and therefore needs the env above.
+      - run: npm run check:tags
+
+  test:
+    name: Tests (shard ${{ matrix.shard.index }}/${{ matrix.shard.total }})
+    needs: [plan, quality]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    env:
+      TEST_ENV: ${{ inputs.test_env || 'dev' }}
+      BASE_URL: ${{ vars.BASE_URL }}
+      API_BASE_URL: ${{ vars.API_BASE_URL }}
+      STANDARD_USERNAME: ${{ vars.STANDARD_USERNAME }}
+      STANDARD_PASSWORD: ${{ secrets.STANDARD_PASSWORD }}
+      PROBLEM_USERNAME: ${{ vars.PROBLEM_USERNAME }}
+      PROBLEM_PASSWORD: ${{ secrets.PROBLEM_PASSWORD }}
+      API_USERNAME: ${{ vars.API_USERNAME }}
+      API_PASSWORD: ${{ secrets.API_PASSWORD }}
+      BROWSERS: ${{ needs.plan.outputs.browsers }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ needs.plan.outputs.browsers || 'all' }}-${{ hashFiles('package-lock.json') }}
+      - name: Install Playwright browsers and system dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps $BROWSERS
+      - name: Install Playwright system dependencies (browsers cached)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps $BROWSERS
+
+      # The blob reporter writes per-shard results (with traces, screenshots and videos) that the
+      # report job merges. `--project` flags come from the plan job, not from user input.
+      - name: Run Playwright tests
+        env:
+          PROJECTS: ${{ needs.plan.outputs.projects }}
+          GREP: ${{ needs.plan.outputs.grep }}
+        run: >
+          npx playwright test $PROJECTS --grep "$GREP"
+          --shard=${{ matrix.shard.index }}/${{ matrix.shard.total }} --reporter=blob
+
+      - name: Upload blob report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: blob-report-${{ matrix.shard.index }}
+          path: blob-report
+          retention-days: 1
+          if-no-files-found: error
+
+  report:
+    name: Merge HTML report
+    needs: test
+    # Run after failures too (that is when the report matters), but not when tests never ran.
+    if: ${{ !cancelled() && needs.test.result != 'skipped' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: blob-report-*
+          path: all-blob-reports
+          merge-multiple: true
+      - name: Merge reports
+        env:
+          PLAYWRIGHT_HTML_OPEN: never
+        run: npx playwright merge-reports --reporter=html,github ./all-blob-reports
+      - name: Upload HTML report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 14
+          if-no-files-found: error

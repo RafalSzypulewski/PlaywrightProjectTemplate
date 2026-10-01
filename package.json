@@ -23,6 +23,7 @@
     "test:smoke": "playwright test --grep @smoke",
     "test:regression": "playwright test --grep @regression",
     "test:e2e": "playwright test --grep @e2e",
+    "test:readonly": "playwright test --grep-invert @destructive",
     "check:tags": "tsx scripts/check-tags.ts"
   },
   "devDependencies": {

@@ -1,11 +1,14 @@
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
-// Every test must carry exactly one type tag and exactly one scope tag, and only known tags, so a
-// typo (e.g. @smok) cannot silently drop a test from a tagged run. Setup tests are exempt.
+// Every test must carry exactly one type tag, @regression (plus @smoke for the critical path), and
+// only known tags, so a typo (e.g. @smok) cannot silently drop a test from a tagged run. Setup
+// tests are exempt.
 const TYPE_TAGS = ['@e2e', '@api'];
 const SCOPE_TAGS = ['@smoke', '@regression'];
-const KNOWN = new Set([...TYPE_TAGS, ...SCOPE_TAGS]);
+// Optional tags. @destructive marks tests that create or change data; read-only runs exclude it.
+const TRAIT_TAGS = ['@destructive'];
+const KNOWN = new Set([...TYPE_TAGS, ...SCOPE_TAGS, ...TRAIT_TAGS]);
 
 interface Spec {
   file: string;
@@ -42,15 +45,12 @@ for (const [name, spec] of specs) {
   const tags = (spec.tags ?? []).map((tag) => `@${tag}`);
   const unknown = tags.filter((tag) => !KNOWN.has(tag));
   const types = tags.filter((tag) => TYPE_TAGS.includes(tag));
-  const scopes = tags.filter((tag) => SCOPE_TAGS.includes(tag));
-  // Smoke tests are a subset of regression, so they carry both scope tags.
-  const validScope =
-    scopes.includes('@regression') &&
-    scopes.every((tag) => ['@smoke', '@regression'].includes(tag));
 
   if (unknown.length > 0) problems.push(`${name}: unknown tag(s) ${unknown.join(', ')}`);
   if (types.length !== 1) problems.push(`${name}: needs exactly one of ${TYPE_TAGS.join(' / ')}`);
-  if (!validScope) problems.push(`${name}: needs @regression (and @smoke if it is a smoke test)`);
+  // Smoke tests are a subset of regression, so @regression is required either way.
+  if (!tags.includes('@regression'))
+    problems.push(`${name}: needs @regression (and @smoke if it is a smoke test)`);
 }
 
 if (problems.length > 0) {

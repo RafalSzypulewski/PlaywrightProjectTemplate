@@ -32,6 +32,7 @@ npm test
 | `npm run test:smoke`      | Run tests tagged `@smoke`                  |
 | `npm run test:regression` | Run tests tagged `@regression` (all tests) |
 | `npm run test:e2e`        | Run tests tagged `@e2e` (UI, all browsers) |
+| `npm run test:readonly`   | Skip tests tagged `@destructive`           |
 | `npm run test:api`        | Run tests tagged `@api` (no browser)       |
 | `npm run check:tags`      | Every test has valid, known tags           |
 
@@ -47,7 +48,7 @@ npm test
 Precedence (highest first): real environment variables (CI secrets), `.env.<TEST_ENV>`, `.env`.
 Empty values count as unset. Missing or invalid values fail at startup with a list of variable
 names and reasons (values are never printed). Import `env` from `config/env` in the Playwright
-config; tests receive it through a fixture once fixtures exist.
+config; tests receive it through the `env` fixture.
 
 | Variable                             | Description                                               |
 | ------------------------------------ | --------------------------------------------------------- |
@@ -60,6 +61,10 @@ config; tests receive it through a fixture once fixtures exist.
 | `<ROLE>_USERNAME`, `<ROLE>_PASSWORD` | Credentials per role (required), e.g. `STANDARD_USERNAME` |
 | `AUTH_MAX_AGE_MIN`                   | Reuse saved sessions younger than this (default 60)       |
 | `AUTH_ROLES`                         | Optional comma-separated subset of roles to authenticate  |
+
+`AUTH_ROLES` is a local speed-up. A spec that uses a role outside it fails with a message naming
+the role, rather than reusing an old session file. Run only the specs that need those roles (e.g.
+`npx playwright test tests/login.spec.ts`), or unset it.
 
 Adding a variable: add it to `env.schema.ts`, expose it in `env.ts`, document it in
 `.env.example`, then run `npm run check:env`.
@@ -118,12 +123,13 @@ in [docs/test-data.md](docs/test-data.md).
 Tags use Playwright's native `tag` option and `--grep`. Every test carries one **type** tag and the
 **scope** tags below:
 
-| Tag           | Meaning                                                                       |
-| ------------- | ----------------------------------------------------------------------------- |
-| `@e2e`        | Drives the UI in a browser (runs in every browser project)                    |
-| `@api`        | Calls the API only (runs once in the browserless `api` project)               |
-| `@regression` | In the full regression run. Every test has it                                 |
-| `@smoke`      | Critical-path subset, fast enough for every change. Also tagged `@regression` |
+| Tag            | Meaning                                                                       |
+| -------------- | ----------------------------------------------------------------------------- |
+| `@e2e`         | Drives the UI in a browser (runs in every browser project)                    |
+| `@api`         | Calls the API only (runs once in the browserless `api` project)               |
+| `@regression`  | In the full regression run. Every test has it                                 |
+| `@smoke`       | Critical-path subset, fast enough for every change. Also tagged `@regression` |
+| `@destructive` | Optional. Creates or changes data; read-only runs exclude it                  |
 
 ```ts
 test.describe('inventory', { tag: ['@e2e', '@regression'] }, () => {
@@ -135,8 +141,9 @@ Combine scripts with Playwright options, e.g. `npm run test:smoke -- --project=c
 arbitrary expressions with `npx playwright test --grep "@smoke|@api"` and `--grep-invert @slow`.
 Tag filters do not filter the auth setup project, so `@smoke` runs still authenticate.
 `npm run check:tags` fails on an unknown tag (e.g. a typo) or a test missing its type or scope tag,
-so a mistake cannot silently drop a test from a run. Project-specific tags (feature areas,
-`@destructive`) can be added to `KNOWN` in `scripts/check-tags.ts`.
+so a mistake cannot silently drop a test from a run. Project-specific tags (feature areas) can be
+added to `KNOWN` in `scripts/check-tags.ts`. For read-only environments such as `prod-smoke`, use
+`npm run test:readonly`, which excludes `@destructive` tests.
 
 ## CI (GitHub Actions)
 
@@ -181,5 +188,7 @@ Artifacts can contain authenticated traces, so limit who can read them.
 
 ## Status
 
-Foundation with example page objects, components, fixtures and authentication. API clients,
-logging and CI are added per project as needed.
+Working examples of every layer: page and component objects, fixtures, role-based authentication,
+an API client with data cleanup, tagging and a sharded CI pipeline. They target public demo
+systems (Sauce Demo and Restful Booker); replace them with your application's pages, endpoints and
+specs when you copy the template.

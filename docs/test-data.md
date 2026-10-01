@@ -70,4 +70,4 @@ Values that are secrets or URLs belong in env variables instead.
 - Per-test ownership plus unique values makes parallel runs safe. Shared mutable records are not
   allowed. If an app needs a distinct user per worker, use a per-worker user pool.
 - Tests that create or change data get the `@destructive` tag. Read-only runs (`prod-smoke`)
-  use `--grep-invert @destructive`.
+  use `npm run test:readonly` (`--grep-invert @destructive`).
